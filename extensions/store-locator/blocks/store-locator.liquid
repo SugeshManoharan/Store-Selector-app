@@ -1,0 +1,67 @@
+{% comment %}
+  Store Selector app embed. Reads the pre-computed store data from the shop
+  metafield (written by the app's "Sync to storefront" button) and renders
+  the popup + store switcher. No network calls from the storefront.
+{% endcomment %}
+
+{%- assign sl_data = shop.metafields.store_selector.data -%}
+
+<div
+  id="store-locator-root"
+  data-force-select="{{ block.settings.force_select }}"
+>
+  <button id="store-locator-trigger" type="button" class="store-locator-trigger">
+    <span class="store-locator-trigger__icon">📍</span>
+    <span id="store-locator-trigger-label">{{ block.settings.change_store_label | default: "Select store" }}</span>
+  </button>
+
+  <div id="store-locator-modal" class="store-locator-modal" hidden>
+    <div class="store-locator-modal__backdrop"></div>
+    <div class="store-locator-modal__panel" role="dialog" aria-modal="true" aria-labelledby="store-locator-modal-title">
+      <button id="store-locator-modal-close" class="store-locator-modal__close" type="button" aria-label="Close">&times;</button>
+      <h2 id="store-locator-modal-title">{{ block.settings.popup_title | default: "Choose your store" }}</h2>
+      <p class="store-locator-modal__subtitle">{{ block.settings.popup_subtitle | default: "We will show products available at your selected store." }}</p>
+      <ul id="store-locator-list" class="store-locator-list"></ul>
+      <p id="store-locator-empty" class="store-locator-empty" hidden>No store locations have been configured yet.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.__STORE_SELECTOR__ = {{ sl_data.value | json }};
+</script>
+<script src="{{ 'store-locator.js' | asset_url }}" defer></script>
+<link rel="stylesheet" href="{{ 'store-locator.css' | asset_url }}">
+
+{% schema %}
+{
+  "name": "Store Selector",
+  "target": "body",
+  "settings": [
+    {
+      "type": "text",
+      "id": "popup_title",
+      "label": "Popup title",
+      "default": "Choose your store"
+    },
+    {
+      "type": "text",
+      "id": "popup_subtitle",
+      "label": "Popup subtitle",
+      "default": "We will show products available at your selected store."
+    },
+    {
+      "type": "text",
+      "id": "change_store_label",
+      "label": "Header button label",
+      "default": "Select store"
+    },
+    {
+      "type": "checkbox",
+      "id": "force_select",
+      "label": "Require a store selection before browsing",
+      "default": false
+    }
+  ]
+}
+{% endschema %}

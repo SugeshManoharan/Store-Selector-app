@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  // "native" for local dev; the rhel target is required for Vercel's
+  // serverless (Amazon Linux) runtime, otherwise Prisma errors at runtime.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "postgresql"
+  // Supabase: DATABASE_URL is the pooled connection (port 6543, pgbouncer),
+  // DIRECT_URL is the direct connection (port 5432) used for migrations.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// Per-shop preference for which native Shopify Locations appear in the
+// storefront store picker. The canonical location data (name, address)
+// always comes live from the Admin API; we only persist the on/off choice.
+model LocationSetting {
+  id         String   @id @default(cuid())
+  shop       String
+  locationId String // Shopify location GID, e.g. gid://shopify/Location/123
+  enabled    Boolean  @default(true)
+  position   Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([shop, locationId])
+  @@index([shop])
+}
+
+// Throttle state for webhook-driven auto-sync. Serverless functions can't keep
+// an in-memory debounce, so we record the last sync time per shop in the DB.
+model SyncState {
+  shop         String   @id
+  lastSyncedAt DateTime @default(now())
+}

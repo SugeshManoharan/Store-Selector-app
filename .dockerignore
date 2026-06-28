@@ -1,0 +1,9 @@
+.cache
+build
+node_modules
+.env
+.env.*
+.shopify
+prisma/dev.sqlite
+prisma/dev.sqlite-journal
+theme
