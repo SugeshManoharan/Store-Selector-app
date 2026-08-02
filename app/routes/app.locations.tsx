@@ -10,6 +10,7 @@ import {
   Text,
   Badge,
   Banner,
+  Checkbox,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -57,12 +58,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
   const enabledMap = new Map(settings.map((s) => [s.locationId, s.enabled]));
 
+  const appSetting = await db.appSetting.findUnique({
+    where: { shop: session.shop },
+  });
+
   return {
     locations: locations.map((l) => ({
       ...l,
       // Default to enabled when no preference has been saved yet.
       enabled: enabledMap.get(l.id) ?? true,
     })),
+    showFloatingButton: appSetting?.showFloatingButton ?? false,
   };
 };
 
@@ -78,6 +84,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }
+  }
+
+  if (intent === "toggleFloating") {
+    const show = String(formData.get("show")) === "true";
+    await db.appSetting.upsert({
+      where: { shop: session.shop },
+      create: { shop: session.shop, showFloatingButton: show },
+      update: { showFloatingButton: show },
+    });
+    try {
+      await syncStorefrontData(admin.graphql, session.shop);
+    } catch (e) {
+      return { ok: true, syncWarning: (e as Error).message };
+    }
+    return { ok: true };
   }
 
   // Toggle a location's visibility, then re-sync so the storefront reflects it.
@@ -100,12 +121,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Locations() {
-  const { locations } = useLoaderData<typeof loader>();
+  const { locations, showFloatingButton } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
 
   const toggle = (locationId: string, current: boolean) => {
     fetcher.submit(
       { locationId, enabled: String(!current) },
+      { method: "POST" },
+    );
+  };
+
+  const toggleFloating = (next: boolean) => {
+    fetcher.submit(
+      { intent: "toggleFloating", show: String(next) },
       { method: "POST" },
     );
   };
@@ -178,6 +206,24 @@ export default function Locations() {
             <Text as="p">{result.error}</Text>
           </Banner>
         )}
+        <Card>
+          <BlockStack gap="200">
+            <Text as="h2" variant="headingMd">
+              Floating store button
+            </Text>
+            <Checkbox
+              label="Show the floating store button on the storefront (top-right)"
+              checked={showFloatingButton}
+              onChange={(next) => toggleFloating(next)}
+            />
+            <Text as="p" tone="subdued" variant="bodySm">
+              Leave off if your theme already has its own store selector (the
+              app follows the theme's selection automatically). Turn on to show
+              our own floating "Select store" button in the top-right corner —
+              it opens the store picker and filters products.
+            </Text>
+          </BlockStack>
+        </Card>
         <Card>
           <BlockStack gap="300">
             <Text as="h2" variant="headingMd">

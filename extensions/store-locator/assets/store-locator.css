@@ -1,23 +1,51 @@
 .store-locator-trigger {
   position: fixed;
-  left: 16px;
-  bottom: 16px;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  left: auto;
+  bottom: auto;
   z-index: 9998;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: calc(100vw - 32px);
   padding: 10px 16px;
   background: #111;
   color: #fff;
   border: none;
   border-radius: 999px;
   font-size: 13px;
+  line-height: 1.2;
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
+.store-locator-trigger__icon {
+  flex: 0 0 auto;
+}
+
+#store-locator-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .store-locator-trigger:hover {
   opacity: 0.85;
+}
+
+/*
+ * On phones the header usually occupies the top-right (menu / search / cart),
+ * so drop the button below a typical header bar and shrink it a little so it
+ * never sits on top of those controls or text.
+ */
+@media (max-width: 749px) {
+  .store-locator-trigger {
+    top: calc(70px + env(safe-area-inset-top, 0px));
+    right: calc(10px + env(safe-area-inset-right, 0px));
+    padding: 7px 12px;
+    font-size: 12px;
+  }
 }
 
 .store-locator-modal {

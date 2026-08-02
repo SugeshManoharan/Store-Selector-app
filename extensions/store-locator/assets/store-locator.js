@@ -48,6 +48,20 @@
     return safeGet(STORAGE_ID_KEY) || getCookie(COOKIE_KEY);
   }
 
+  function normalize(s) {
+    return String(s || "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function findLocationByName(name) {
+    var n = normalize(name);
+    for (var i = 0; i < stores.length; i++) {
+      if (normalize(stores[i].name) === n) return stores[i];
+    }
+    return null;
+  }
+
   function setSelectedStore(id, name) {
     try {
       localStorage.setItem(STORAGE_ID_KEY, id);
@@ -139,7 +153,83 @@
     );
   }
 
-  function init() {
+  // ---- Pocco theme integration -------------------------------------------
+  // The Pocco theme ships its own store selector in the header. It stores the
+  // chosen store NAME in localStorage['selected-store'] and shows it in a
+  // ".get_storename" element. When that theme is present we hide our own
+  // button and simply mirror its selection into our product filter, matching
+  // by store name (Pocco's store Name must equal the Shopify location name).
+  var POCCO_LS_KEY = "selected-store";
+
+  function poccoPresent() {
+    return !!(
+      document.querySelector("store-selector, .get_storename") ||
+      safeGet(POCCO_LS_KEY)
+    );
+  }
+
+  function poccoSelectedName() {
+    var el = document.querySelector(".get_storename");
+    if (el && el.textContent.trim()) return el.textContent.trim();
+    return safeGet(POCCO_LS_KEY);
+  }
+
+  function syncFromPocco() {
+    var name = poccoSelectedName();
+    if (!name) return;
+    var loc = findLocationByName(name);
+    if (!loc) return; // Pocco store with no matching location — leave unfiltered
+    // Persist so other pages filter instantly on load.
+    try {
+      localStorage.setItem(STORAGE_ID_KEY, loc.id);
+      localStorage.setItem(STORAGE_NAME_KEY, loc.name);
+    } catch (e) {
+      /* ignore */
+    }
+    setCookie(COOKIE_KEY, loc.id);
+    applyFilter(loc.id);
+  }
+
+  function watchPocco() {
+    var lastName = poccoSelectedName();
+
+    // Observe the header store-name element; its text changes on switch.
+    var nameEl = document.querySelector(".get_storename");
+    if (nameEl && window.MutationObserver) {
+      new MutationObserver(function () {
+        var n = poccoSelectedName();
+        if (n && n !== lastName) {
+          lastName = n;
+          syncFromPocco();
+        }
+      }).observe(nameEl, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+    }
+
+    // Fallback poll (localStorage writes in the same tab don't fire "storage").
+    setInterval(function () {
+      var n = poccoSelectedName();
+      if (n && n !== lastName) {
+        lastName = n;
+        syncFromPocco();
+      }
+    }, 800);
+
+    // Cross-tab changes.
+    window.addEventListener("storage", function (e) {
+      if (e.key === POCCO_LS_KEY) syncFromPocco();
+    });
+  }
+
+  function hideOwnButton() {
+    if (trigger) trigger.style.display = "none";
+  }
+  // ------------------------------------------------------------------------
+
+  function initStandalone() {
     renderStores();
 
     var selectedId = getSelectedId();
@@ -160,6 +250,21 @@
       .addEventListener("click", function () {
         if (!forceSelect || getSelectedId()) closeModal();
       });
+  }
+
+  function init() {
+    var showFloating = !!(data.settings && data.settings.showFloatingButton);
+
+    // If the theme has its own store selector (e.g. Pocco) and the merchant
+    // hasn't explicitly enabled our floating button, follow the theme's
+    // selection instead of showing a duplicate control.
+    if (poccoPresent() && !showFloating) {
+      hideOwnButton();
+      syncFromPocco();
+      watchPocco();
+      return;
+    }
+    initStandalone();
   }
 
   if (document.readyState === "loading") {

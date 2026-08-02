@@ -2,7 +2,7 @@
 
 client_id = "bb1131e9b0f45483a696829d30b15cc5"
 name = "Store-Selector"
-application_url = "https://shopify.dev/apps/default-app-home"
+application_url = "https://store-selector.vercel.app"
 embedded = true
 
 [access_scopes]
@@ -38,7 +38,11 @@ api_version = "2026-07"
   compliance_topics = [ "shop/redact" ]
 
 [auth]
-redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+redirect_urls = [
+  "https://store-selector.vercel.app/auth/callback",
+  "https://store-selector.vercel.app/auth/shopify/callback",
+  "https://store-selector.vercel.app/api/auth/callback"
+]
 
 [build]
 automatically_update_urls_on_dev = true

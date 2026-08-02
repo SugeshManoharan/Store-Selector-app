@@ -124,6 +124,8 @@ export async function syncStorefrontData(admin: AdminGraphql, shop: string) {
     availability[loc.id] = await productIdsAtLocation(admin, loc.id);
   }
 
+  const appSetting = await db.appSetting.findUnique({ where: { shop } });
+
   const payload = {
     locations: enabled.map((l: any) => ({
       id: l.id,
@@ -131,6 +133,9 @@ export async function syncStorefrontData(admin: AdminGraphql, shop: string) {
       address: (l.address?.formatted ?? []).join(", ") || null,
     })),
     availability,
+    settings: {
+      showFloatingButton: appSetting?.showFloatingButton ?? false,
+    },
     updatedAt: new Date().toISOString(),
   };
 

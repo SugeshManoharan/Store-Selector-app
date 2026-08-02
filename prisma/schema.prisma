@@ -60,3 +60,9 @@ model SyncState {
   shop         String   @id
   lastSyncedAt DateTime @default(now())
 }
+
+// Per-shop storefront display settings, published into the shop metafield.
+model AppSetting {
+  shop               String  @id
+  showFloatingButton Boolean @default(false)
+}
