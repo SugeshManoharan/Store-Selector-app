@@ -12,6 +12,9 @@
   var data = window.__STORE_SELECTOR__ || {};
   var stores = data.locations || [];
   var availability = data.availability || {};
+  // Products deliverable across the whole UK — always shown, whatever store is
+  // selected (and before any selection is made).
+  var nationwide = data.nationwide || [];
 
   var modal = document.getElementById("store-locator-modal");
   var list = document.getElementById("store-locator-list");
@@ -133,7 +136,7 @@
     var cards = document.querySelectorAll("[data-product-id]");
     if (!cards.length) return;
 
-    var allowedIds = availability[locationId] || [];
+    var allowedIds = (availability[locationId] || []).concat(nationwide);
     var allowed = {};
     allowedIds.forEach(function (id) {
       allowed[String(id)] = true;

@@ -43,11 +43,86 @@ async function ensureDefinition(admin: AdminGraphql) {
   }
 }
 
+// Ensures the product-level "nationwide delivery" boolean metafield definition
+// exists. This is the single flag both apps read: products with it set to true
+// are shown under every store and skip postcode gating at checkout.
+async function ensureNationwideDefinition(admin: AdminGraphql) {
+  const response = await admin(
+    `#graphql
+      mutation CreateNationwideDef($definition: MetafieldDefinitionInput!) {
+        metafieldDefinitionCreate(definition: $definition) {
+          createdDefinition { id }
+          userErrors { field message code }
+        }
+      }`,
+    {
+      variables: {
+        definition: {
+          name: "Nationwide (UK-wide) delivery",
+          namespace: "custom",
+          key: "nationwide_delivery",
+          type: "boolean",
+          ownerType: "PRODUCT",
+          access: { storefront: "PUBLIC_READ" },
+        },
+      },
+    },
+  );
+  const json = await response.json();
+  const errors = json.data?.metafieldDefinitionCreate?.userErrors ?? [];
+  const fatal = errors.filter((e: any) => e.code !== "TAKEN");
+  if (fatal.length) {
+    throw new Error(
+      "Failed to create nationwide metafield definition: " + JSON.stringify(fatal),
+    );
+  }
+}
+
 async function getShopId(admin: AdminGraphql): Promise<string> {
   const response = await admin(`#graphql
     query { shop { id } }`);
   const json = await response.json();
   return json.data.shop.id;
+}
+
+// Collects the numeric product ids flagged for UK-wide delivery via the
+// custom.nationwide_delivery metafield. These are shown under every store,
+// regardless of where they are stocked.
+async function nationwideProductIds(admin: AdminGraphql): Promise<string[]> {
+  const ids = new Set<string>();
+  let cursor: string | null = null;
+  let pages = 0;
+  const MAX_PAGES = 50;
+
+  do {
+    const response: Response = await admin(
+      `#graphql
+        query Nationwide($cursor: String) {
+          products(
+            first: 250
+            after: $cursor
+            query: "metafield:custom.nationwide_delivery:true"
+          ) {
+            nodes { id }
+            pageInfo { hasNextPage endCursor }
+          }
+        }`,
+      { variables: { cursor } },
+    );
+    const body: any = await response.json();
+    const products = body.data?.products;
+    if (!products) break;
+
+    for (const node of products.nodes ?? []) {
+      const numeric = String(node.id).split("/").pop();
+      if (numeric) ids.add(numeric);
+    }
+
+    cursor = products.pageInfo?.hasNextPage ? products.pageInfo.endCursor : null;
+    pages += 1;
+  } while (cursor && pages < MAX_PAGES);
+
+  return Array.from(ids);
 }
 
 // Collects the numeric product ids that have available inventory (> 0) at the
@@ -126,6 +201,8 @@ export async function syncStorefrontData(admin: AdminGraphql, shop: string) {
 
   const appSetting = await db.appSetting.findUnique({ where: { shop } });
 
+  const nationwide = await nationwideProductIds(admin);
+
   const payload = {
     locations: enabled.map((l: any) => ({
       id: l.id,
@@ -133,6 +210,9 @@ export async function syncStorefrontData(admin: AdminGraphql, shop: string) {
       address: (l.address?.formatted ?? []).join(", ") || null,
     })),
     availability,
+    // Products available for delivery across the whole UK — shown under every
+    // store, on top of each location's own stocked products.
+    nationwide,
     settings: {
       showFloatingButton: appSetting?.showFloatingButton ?? false,
     },
@@ -140,6 +220,7 @@ export async function syncStorefrontData(admin: AdminGraphql, shop: string) {
   };
 
   await ensureDefinition(admin);
+  await ensureNationwideDefinition(admin);
   const shopId = await getShopId(admin);
 
   const setResponse = await admin(
@@ -172,6 +253,7 @@ export async function syncStorefrontData(admin: AdminGraphql, shop: string) {
 
   return {
     locationCount: payload.locations.length,
+    nationwideCount: nationwide.length,
     productCounts: Object.fromEntries(
       payload.locations.map((l: any) => [
         l.name,

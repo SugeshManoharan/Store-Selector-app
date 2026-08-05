@@ -25,6 +25,11 @@ api_version = "2026-07"
   uri = "/webhooks/inventory_levels/update"
   topics = [ "inventory_levels/update" ]
 
+  # Auto-refresh when a product changes (e.g. the nationwide-delivery flag).
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/products/update"
+  topics = [ "products/update" ]
+
   [[webhooks.subscriptions]]
   uri = "/webhooks/customers/data_request"
   compliance_topics = [ "customers/data_request" ]
